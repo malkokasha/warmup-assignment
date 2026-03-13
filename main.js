@@ -110,7 +110,7 @@ function metQuota(date, activeTime) {
 // shiftObj: (typeof object) has driverID, driverName, date, startTime, endTime
 // Returns: object with 10 properties or empty object {}
 // ============================================================
-unction readShifts(textFile) {
+function readShifts(textFile) {
   const content = fs.readFileSync(textFile, "utf8").trim();
   if (!content) return [];
   return content.split("\n").map((line) => line.split(",").map((c) => c.trim().replace(/\r/g, "")));
@@ -129,7 +129,51 @@ function addShiftRecord(textFile, shiftObj) {
   for (const row of rows) {
     if (row[0] === driverID && row[2] === date) {
       return {};
-    
+    }
+  }
+  const shiftDuration = getShiftDuration(startTime, endTime);
+  const idleTime      = getIdleTime(startTime, endTime);
+  const activeTime    = getActiveTime(shiftDuration, idleTime);
+  const quota         = metQuota(date, activeTime);
+  const hasBonus      = false;
+ 
+  const newRow = [
+    driverID,
+    driverName,
+    date,
+    startTime.trim(),
+    endTime.trim(),
+    shiftDuration,
+    idleTime,
+    activeTime,
+    quota,
+    hasBonus,
+  ];
+   let lastIndexOfDriver = -1;
+  for (let i = 0; i < rows.length; i++) {
+    if (rows[i][0] === driverID) {
+      lastIndexOfDriver = i;
+    }
+  }
+  if (lastIndexOfDriver === -1) {
+    rows.push(newRow);
+  } else {
+    rows.splice(lastIndexOfDriver + 1, 0, newRow);
+  }
+  writeShifts(textFile, rows);
+  return {
+    driverID,
+    driverName,
+    date,
+    startTime: startTime.trim(),
+    endTime: endTime.trim(),
+    shiftDuration,
+    idleTime,
+    activeTime,
+    metQuota: quota,
+    hasBonus,
+  };
+}
 
 // ============================================================
 // Function 6: setBonus(textFile, driverID, date, newValue)
@@ -160,8 +204,19 @@ function setBonus(textFile, driverID, date, newValue) {
 // ============================================================
 function countBonusPerMonth(textFile, driverID, month) {
     // TODO: Implement this function
+    const rows = readShifts(textFile);
+  const targetMonth = parseInt(month, 10);
+  const driverRows = rows.filter((r) => r[0] === driverID);
+  if (driverRows.length === 0) return -1;
+  let count = 0;
+  for (const row of driverRows) {
+    const rowMonth = parseInt(row[2].split("-")[1], 10);
+    if (rowMonth === targetMonth && row[9].trim().toLowerCase() === "true") {
+      count++;
+    }
+  }
+  return count;
 }
-
 // ============================================================
 // Function 8: getTotalActiveHoursPerMonth(textFile, driverID, month)
 // textFile: (typeof string) path to shifts text file
