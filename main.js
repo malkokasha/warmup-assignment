@@ -88,6 +88,7 @@ function getActiveTime(shiftDuration, idleTime) {
 // activeTime: (typeof string) formatted as h:mm:ss
 // Returns: boolean
 // ============================================================
+
 function isEidPeriod(dateStr) {
   const d = new Date(dateStr);
   const year = d.getUTCFullYear();
@@ -95,7 +96,9 @@ function isEidPeriod(dateStr) {
   const day = d.getUTCDate();
   return year === 2025 && month === 4 && day >= 10 && day <= 30;
 }
-
+// i adde smth small to readshift and the one under it 
+// samll fix
+//rtyuio
 function metQuota(date, activeTime) {
     // TODO: Implement this function
     const activeSec = parseDurationToSeconds(activeTime);
@@ -217,6 +220,7 @@ function countBonusPerMonth(textFile, driverID, month) {
   }
   return count;
 }
+
 // ============================================================
 // Function 8: getTotalActiveHoursPerMonth(textFile, driverID, month)
 // textFile: (typeof string) path to shifts text file
@@ -291,6 +295,7 @@ function getRequiredHoursPerMonth(textFile, rateFile, bonusCount, driverID, mont
  
   let totalSec = 0;
  
+
   for (const row of rows) {
     if (row[0] !== driverID) continue;
     const dateStr = row[2];
