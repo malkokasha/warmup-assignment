@@ -224,8 +224,31 @@ function countBonusPerMonth(textFile, driverID, month) {
 // month: (typeof number)
 // Returns: string formatted as hhh:mm:ss
 // ============================================================
+function parseAnyDurationToSeconds(durStr) {
+  durStr = durStr.trim();
+  const [hStr, mStr, sStr] = durStr.split(":");
+  return parseInt(hStr, 10) * 3600 + parseInt(mStr, 10) * 60 + parseInt(sStr, 10);
+}
+
+function secondsToLongDuration(totalSeconds) {
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
+  return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+}
+
 function getTotalActiveHoursPerMonth(textFile, driverID, month) {
     // TODO: Implement this function
+    const rows = readShifts(textFile);
+  const targetMonth = typeof month === "number" ? month : parseInt(month, 10);
+  let totalSec = 0;
+  for (const row of rows) {
+    if (row[0] !== driverID) continue;
+    const rowMonth = parseInt(row[2].split("-")[1], 10);
+    if (rowMonth !== targetMonth) continue;
+    totalSec += parseAnyDurationToSeconds(row[7]);
+     }
+     return secondsToLongDuration(totalSec);
 }
 
 // ============================================================
@@ -237,8 +260,50 @@ function getTotalActiveHoursPerMonth(textFile, driverID, month) {
 // month: (typeof number)
 // Returns: string formatted as hhh:mm:ss
 // ============================================================
+function readRates(rateFile) {
+  const content = fs.readFileSync(rateFile, "utf8").trim();
+  if (!content) return [];
+  return content.split("\n").map((line) => {
+    const parts = line.split(",").map((c) => c.trim().replace(/\r/g, ""));
+    return {
+      driverID: parts[0],
+      dayOff: parts[1],
+      basePay: parseInt(parts[2], 10),
+      tier: parseInt(parts[3], 10),
+    };
+  });
+}
+
+function getDayName(dateStr) {
+  const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  return days[new Date(dateStr).getUTCDay()];
+}
+
 function getRequiredHoursPerMonth(textFile, rateFile, bonusCount, driverID, month) {
     // TODO: Implement this function
+    const rows = readShifts(textFile);
+  const rates = readRates(rateFile);
+  const targetMonth = typeof month === "number" ? month : parseInt(month, 10);
+ 
+  const rate = rates.find((r) => r.driverID === driverID);
+    if (!rate) return secondsToLongDuration(0);
+    const dayOff = rate.dayOff;
+ 
+  let totalSec = 0;
+ 
+  for (const row of rows) {
+    if (row[0] !== driverID) continue;
+    const dateStr = row[2];
+    const rowMonth = parseInt(dateStr.split("-")[1], 10);
+     if (rowMonth !== targetMonth) continue;
+     if (dayOff && getDayName(dateStr) === dayOff) continue;
+     const quotaSec = isEidPeriod(dateStr)
+      ? 6 * 3600: 8 * 3600 + 24 * 60;
+      totalSec += quotaSec;
+  }
+  const bonusDeduction = bonusCount * 2 * 3600;
+  totalSec = Math.max(0, totalSec - bonusDeduction);
+  return secondsToLongDuration(totalSec);
 }
 
 // ============================================================
@@ -251,6 +316,26 @@ function getRequiredHoursPerMonth(textFile, rateFile, bonusCount, driverID, mont
 // ============================================================
 function getNetPay(driverID, actualHours, requiredHours, rateFile) {
     // TODO: Implement this function
+    const rates = readRates(rateFile);
+const rate = rates.find((r) => r.driverID === driverID);
+if (!rate) return 0;
+
+const { basePay, tier } = rate;
+ 
+  const actualSec   = parseAnyDurationToSeconds(actualHours);
+  const requiredSec = parseAnyDurationToSeconds(requiredHours);
+  if (actualSec >= requiredSec) return basePay;
+ 
+  const missingSec = requiredSec - actualSec;
+  const missingHours = missingSec / 3600;
+  const allowance = { 1: 50, 2: 20, 3: 10, 4: 3 }[tier] || 0;
+  const billableHours = Math.max(0, missingHours - allowance);
+  const billableFullHours = Math.floor(billableHours);
+ 
+  const deductionRatePerHour = Math.floor(basePay / 185);
+  const salaryDeduction = billableFullHours * deductionRatePerHour;
+ 
+  return basePay - salaryDeduction;
 }
 
 module.exports = {
